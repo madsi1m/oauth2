@@ -31,6 +31,7 @@ use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
 use OCP\AppFramework\Http\RedirectResponse;
 use OCP\AppFramework\Http\TemplateResponse;
+use OCP\IConfig;
 use OCP\ILogger;
 use OCP\IRequest;
 use OCP\IURLGenerator;
@@ -47,6 +48,8 @@ class PageController extends Controller {
 	private $authorizationCodeMapper;
 	/** @var AccessTokenMapper */
 	private $accessTokenMapper;
+	/** @var \OCP\IConfig */
+	private $config;
 	/** @var ILogger */
 	private $logger;
 	/** @var IURLGenerator */
@@ -64,6 +67,7 @@ class PageController extends Controller {
 	 * @param ClientMapper $clientMapper The client mapper.
 	 * @param AuthorizationCodeMapper $authorizationCodeMapper The authorization code mapper.
 	 * @param AccessTokenMapper $accessTokenMapper The access token mapper.
+	 * @param IConfig $config
 	 * @param ILogger $logger The logger.
 	 * @param IURLGenerator $urlGenerator
 	 * @param IUserSession $userSession
@@ -73,6 +77,7 @@ class PageController extends Controller {
 								ClientMapper $clientMapper,
 								AuthorizationCodeMapper $authorizationCodeMapper,
 								AccessTokenMapper $accessTokenMapper,
+								IConfig $config,
 								ILogger $logger,
 								IURLGenerator $urlGenerator,
 								IUserSession $userSession,
@@ -83,6 +88,7 @@ class PageController extends Controller {
 		$this->clientMapper = $clientMapper;
 		$this->authorizationCodeMapper = $authorizationCodeMapper;
 		$this->accessTokenMapper = $accessTokenMapper;
+		$this->config = $config;
 		$this->logger = $logger;
 		$this->urlGenerator = $urlGenerator;
 		$this->userSession = $userSession;
@@ -171,6 +177,15 @@ class PageController extends Controller {
 			}
 
 			return new RedirectResponse($errorRedirectUri);
+		}
+
+		//Bypass authorise page for approved clients (eg phoenix)
+		$automatic=$this->config->getSystemValue('oauth2automatic',array());
+		if (!is_array($automatic)) {
+			$automatic=array($automatic);
+		}
+		if (in_array($client->getName(),$automatic)) {
+			return $this->generateAuthorizationCode($response_type, $client_id, $redirect_uri, $state);
 		}
 
 		$logoutUrl = $this->urlGenerator->linkToRouteAbsolute(
